@@ -1,0 +1,56 @@
+# Operating systems and temporary files
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+*.tmp
+
+# IDE and editor files
+.atom/
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Legacy VCS and local history
+.history
+.svn/
+
+# Dart, Flutter and Pub
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Platform build outputs
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Native/toolchain artifacts
+*.class
+*.pyc
+.build/
+.buildlog/
+.swiftpm/
+migrate_working_dir/
+
+# Obfuscation and symbolication outputs
+app.*.symbols
+app.*.map.json
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+android/key.properties
+*.keystore
+*.jks
