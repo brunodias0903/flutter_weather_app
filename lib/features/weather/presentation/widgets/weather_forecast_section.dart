@@ -3,14 +3,10 @@ import 'package:flutter/material.dart';
 import 'weather_models.dart';
 
 class WeatherSectionHeader extends StatelessWidget {
-  const WeatherSectionHeader({
-    super.key,
-    required this.left,
-    required this.right,
-  });
+  const WeatherSectionHeader({super.key, required this.left, this.trailing});
 
   final String left;
-  final String right;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -24,14 +20,7 @@ class WeatherSectionHeader extends StatelessWidget {
             color: const Color(0xFF111827),
           ),
         ),
-        const Spacer(),
-        Text(
-          right,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            color: const Color(0xFF1D72E7),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        if (trailing != null) ...[const Spacer(), trailing!],
       ],
     );
   }

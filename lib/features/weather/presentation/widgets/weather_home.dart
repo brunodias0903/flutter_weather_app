@@ -9,7 +9,7 @@ import 'weather_language.dart';
 import 'weather_metrics_section.dart';
 import 'weather_models.dart';
 
-class WeatherHome extends StatelessWidget {
+class WeatherHome extends StatefulWidget {
   const WeatherHome({
     super.key,
     required this.weather,
@@ -32,34 +32,47 @@ class WeatherHome extends StatelessWidget {
   final Future<void> Function() onRefresh;
 
   @override
+  State<WeatherHome> createState() => _WeatherHomeState();
+}
+
+class _WeatherHomeState extends State<WeatherHome> {
+  int _dailyForecastDays = 7;
+
+  @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
 
-    final cityName = weather?.cityName.isNotEmpty == true
-        ? weather!.cityName
-        : (language.isPtBr ? 'Sua localizacao' : 'Your location');
+    final cityName = widget.weather?.cityName.isNotEmpty == true
+        ? widget.weather!.cityName
+        : (widget.language.isPtBr ? 'Sua localizacao' : 'Your location');
 
-    final currentTemp = weather?.tempC.round() ?? 0;
+    final currentTemp = widget.weather?.tempC.round() ?? 0;
     final condition =
-        capitalize(weather?.description) ??
-        (language.isPtBr ? 'Carregando' : 'Loading');
-    final humidity = weather?.humidity ?? 0;
-    final windMs = weather?.windSpeedMs ?? 0;
-    final visibilityM = weather?.visibilityM ?? 0;
+        capitalize(widget.weather?.description) ??
+        (widget.language.isPtBr ? 'Carregando' : 'Loading');
+    final humidity = widget.weather?.humidity ?? 0;
+    final windMs = widget.weather?.windSpeedMs ?? 0;
+    final visibilityM = widget.weather?.visibilityM ?? 0;
 
-    final windValue = language.isPtBr
+    final windValue = widget.language.isPtBr
         ? '${(windMs * 3.6).toStringAsFixed(0)} km/h'
         : '${(windMs * 2.23694).toStringAsFixed(0)} mph';
-    final visibilityValue = language.isPtBr
+    final visibilityValue = widget.language.isPtBr
         ? '${(visibilityM / 1000).toStringAsFixed(1)} km'
         : '${(visibilityM * 0.000621371).toStringAsFixed(1)} mi';
 
-    final errorMessage = locationError ?? apiError;
-    final hourly = _buildHourlyForecastItems(language, currentTemp);
-    final daily = _buildDailyForecastItems(language, currentTemp, condition);
+    final errorMessage = widget.locationError ?? widget.apiError;
+    final hourly = _buildHourlyForecastItems(widget.language, currentTemp, now);
+    final daily = _buildDailyForecastItems(
+      widget.language,
+      currentTemp,
+      condition,
+      now,
+      _dailyForecastDays,
+    );
     final metrics = _buildMetricItems(
-      language: language,
-      weather: weather,
+      language: widget.language,
+      weather: widget.weather,
       windValue: windValue,
       humidity: humidity,
       visibilityValue: visibilityValue,
@@ -69,15 +82,15 @@ class WeatherHome extends StatelessWidget {
       backgroundColor: const Color(0xFFE9EDF2),
       appBar: WeatherTopBar(
         cityName: cityName,
-        dateLabel: formatWeatherDate(now, language),
-        language: language,
-        onToggleLanguage: onToggleLanguage,
-        onReloadLocation: onReloadLocation,
+        dateLabel: formatWeatherDate(now, widget.language),
+        language: widget.language,
+        onToggleLanguage: widget.onToggleLanguage,
+        onReloadLocation: widget.onReloadLocation,
       ),
       body: SafeArea(
         top: false,
         child: RefreshIndicator(
-          onRefresh: onRefresh,
+          onRefresh: widget.onRefresh,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
@@ -88,26 +101,30 @@ class WeatherHome extends StatelessWidget {
                 WeatherCurrentSummary(
                   currentTemp: currentTemp,
                   condition: condition,
-                  updatedAtLabel: weather == null
+                  updatedAtLabel: widget.weather == null
                       ? '--'
-                      : formatUpdatedAt(weather!.updatedAt, language),
-                  showUpdatedAt: weather != null,
-                  isLoading: isLoading,
+                      : formatUpdatedAt(
+                          widget.weather!.updatedAt,
+                          widget.language,
+                        ),
+                  showUpdatedAt: widget.weather != null,
+                  isLoading: widget.isLoading,
                   errorMessage: errorMessage,
                 ),
                 const SizedBox(height: 30),
                 WeatherSectionHeader(
-                  left: language.isPtBr
-                      ? 'Previsao por hora'
+                  left: widget.language.isPtBr
+                      ? 'Previsão por hora'
                       : 'Hourly Forecast',
-                  right: language.isPtBr ? 'Detalhes' : 'Details',
                 ),
                 const SizedBox(height: 14),
                 HourlyForecastSection(items: hourly),
                 const SizedBox(height: 34),
                 WeatherSectionHeader(
-                  left: language.isPtBr ? 'Previsao diaria' : 'Daily Forecast',
-                  right: language.isPtBr ? '7 dias' : '7 Days',
+                  left: widget.language.isPtBr
+                      ? 'Previsão diária'
+                      : 'Daily Forecast',
+                  trailing: _buildDailyForecastRangeSelect(context),
                 ),
                 const SizedBox(height: 14),
                 DailyForecastSection(items: daily),
@@ -124,61 +141,155 @@ class WeatherHome extends StatelessWidget {
   List<HourlyForecastItem> _buildHourlyForecastItems(
     UiLanguage language,
     int currentTemp,
+    DateTime now,
   ) {
-    return [
-      HourlyForecastItem(
-        label: language.isPtBr ? 'Agora' : 'Now',
+    final startHour = now.hour;
+    return List<HourlyForecastItem>.generate(24 - startHour, (index) {
+      final hour = startHour + index;
+      final isNow = index == 0;
+      return HourlyForecastItem(
+        label: isNow
+            ? (language.isPtBr ? 'Agora' : 'Now')
+            : _formatHourLabel(hour, language),
         temp: '$currentTemp°',
         icon: Icons.wb_cloudy_outlined,
-        selected: true,
+        selected: isNow,
+      );
+    });
+  }
+
+  String _formatHourLabel(int hour, UiLanguage language) {
+    if (language.isPtBr) {
+      return '${hour.toString().padLeft(2, '0')}h';
+    }
+
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '$hour12 $period';
+  }
+
+  Widget _buildDailyForecastRangeSelect(BuildContext context) {
+    final theme = Theme.of(context);
+    final options = <int>[1, 3, 7];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      const HourlyForecastItem(
-        label: '2 PM',
-        temp: '74°',
-        icon: Icons.wb_sunny_outlined,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _dailyForecastDays,
+          borderRadius: BorderRadius.circular(12),
+          dropdownColor: Colors.white,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFF111827),
+          ),
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w600,
+          ),
+          items: options
+              .map(
+                (days) => DropdownMenuItem<int>(
+                  value: days,
+                  child: Text(_dailyRangeLabel(days, widget.language)),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value == null || value == _dailyForecastDays) return;
+            setState(() {
+              _dailyForecastDays = value;
+            });
+          },
+        ),
       ),
-      const HourlyForecastItem(
-        label: '3 PM',
-        temp: '75°',
-        icon: Icons.wb_sunny_outlined,
-      ),
-      const HourlyForecastItem(
-        label: '4 PM',
-        temp: '73°',
-        icon: Icons.cloud_outlined,
-      ),
-      const HourlyForecastItem(label: '5 PM', temp: '70°', icon: Icons.grain),
-    ];
+    );
+  }
+
+  String _dailyRangeLabel(int days, UiLanguage language) {
+    if (days == 1) {
+      return language.isPtBr ? 'Hoje' : 'Today';
+    }
+
+    return language.isPtBr ? '$days dias' : '$days days';
   }
 
   List<DailyForecastItem> _buildDailyForecastItems(
     UiLanguage language,
     int currentTemp,
     String condition,
+    DateTime now,
+    int totalDays,
   ) {
-    return [
-      DailyForecastItem(
-        day: language.isPtBr ? 'Hoje' : 'Today',
-        condition: condition,
-        icon: Icons.wb_sunny_outlined,
-        high: '${currentTemp + 4}°',
-        low: '${currentTemp - 4}°',
-      ),
-      DailyForecastItem(
-        day: language.isPtBr ? 'Ter' : 'Tue',
-        condition: language.isPtBr ? 'Chuva' : 'Rain',
-        icon: Icons.grain,
-        high: '${currentTemp - 1}°',
-        low: '${currentTemp - 8}°',
-      ),
-      DailyForecastItem(
-        day: language.isPtBr ? 'Qua' : 'Wed',
-        condition: language.isPtBr ? 'Ensolarado' : 'Sunny',
-        icon: Icons.wb_sunny_outlined,
-        high: '${currentTemp + 2}°',
-        low: '${currentTemp - 6}°',
-      ),
+    const highOffsets = [4, 3, 2, 1, 0, 2, 1];
+    const lowOffsets = [-4, -5, -6, -4, -7, -8, -6];
+    const ptConditions = [
+      'Chuva',
+      'Ensolarado',
+      'Nublado',
+      'Chuva fraca',
+      'Ventando',
+      'Parcialmente nublado',
     ];
+    const enConditions = [
+      'Rain',
+      'Sunny',
+      'Cloudy',
+      'Light rain',
+      'Windy',
+      'Partly cloudy',
+    ];
+    const icons = [
+      Icons.wb_sunny_outlined,
+      Icons.grain,
+      Icons.cloud_outlined,
+      Icons.wb_cloudy_outlined,
+      Icons.air,
+      Icons.cloud_outlined,
+      Icons.wb_sunny_outlined,
+    ];
+
+    final baseDate = DateTime(now.year, now.month, now.day);
+
+    final daysToShow = totalDays.clamp(1, 7).toInt();
+
+    return List<DailyForecastItem>.generate(daysToShow, (index) {
+      final date = baseDate.add(Duration(days: index));
+      final isToday = index == 0;
+      final conditionLabel = isToday
+          ? condition
+          : (language.isPtBr
+                ? ptConditions[(index - 1) % ptConditions.length]
+                : enConditions[(index - 1) % enConditions.length]);
+
+      return DailyForecastItem(
+        day: _formatDayLabel(date, language, isToday: isToday),
+        condition: conditionLabel,
+        icon: icons[index],
+        high: '${currentTemp + highOffsets[index]}°',
+        low: '${currentTemp + lowOffsets[index]}°',
+      );
+    });
+  }
+
+  String _formatDayLabel(
+    DateTime date,
+    UiLanguage language, {
+    required bool isToday,
+  }) {
+    if (isToday) {
+      return language.isPtBr ? 'Hoje' : 'Today';
+    }
+
+    const weekdaysPt = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
+    const weekdaysEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final weekdays = language.isPtBr ? weekdaysPt : weekdaysEn;
+    return weekdays[date.weekday - 1];
   }
 
   List<MetricItem> _buildMetricItems({
